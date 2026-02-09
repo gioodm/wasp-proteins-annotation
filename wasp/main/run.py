@@ -49,7 +49,7 @@ def main():
     parser.add_argument("-t", "--taxid", required=True)
     parser.add_argument("-e", "--eval_thr", type=float, default=1e-10)
     parser.add_argument("-b", "--bits_thr", type=int, default=50)
-    parser.add_argument("-n", "--max_n ", type=int, default=10)
+    parser.add_argument("-n", "--max_n", type=int, default=10)
     parser.add_argument("-s", "--step", type=int, default=10)
     parser.add_argument("-i", "--iters", type=int, default=3)
 
