@@ -70,8 +70,7 @@ def main():
         sys.exit(0)
 
     # Set environment variable for foldseek
-    #os.environ["PATH"] = f"{os.getcwd()}/foldseek/bin/:{os.environ['PATH']}"
-    os.environ["PATH"] = f"/rds/general/user/gd1122/projects/rlalab/live/results_benchmark/foldseek/bin/:{os.environ['PATH']}"
+    os.environ["PATH"] = f"{os.getcwd()}/foldseek/bin/:{os.environ['PATH']}"
 
     # Check required commands
     check_command("foldseek")
@@ -89,9 +88,9 @@ def main():
     ####---- DOWNLOADING FILES AND DATABASES ----####
 
     # Define directory names
-    db_dir = "/rds/general/user/gd1122/projects/rlalab/live/WASP_old/foldseek_dbs"
-    prot_dir = "/rds/general/user/gd1122/projects/rlalab/live/WASP_old/proteomes_benchmark"
-    results_dir = "/rds/general/user/gd1122/projects/rlalab/live/results_benchmark"
+    db_dir = "foldseek_dbs"
+    prot_dir = "proteomes"
+    results_dir = "results"
     taxid_dir = f"{results_dir}/{args.taxid}"
 
     # Create directories

@@ -1,9 +1,6 @@
 #!/usr/bin/env python3.10
 # @author Giorgia Del Missier
 
-#!/usr/bin/env python3.10
-# Author: Giorgia Del Missier
-
 import os
 import sys
 import json
@@ -179,113 +176,6 @@ def make_barcharts(txid, coll, outfig, iteration):
 
     chart_collateral = chart_collateral.configure_legend(labelFontSize=8)
     chart_collateral.save(f"{outfig}_collateral_iter{iteration}.png", ppi=200)
-
-# def analyze_safe_results_old(df_anno, df_safe, ids, allp, output, wd, iteration, nan):
-
-#     taxid, collateral = {}, {}
-
-#     for key in ["total", "previously annotated", "not annotated", "nan2nan", "new annotation by WASP", "nan2nan in dark clusters"]:
-#         taxid[key], collateral[key] = {}, {}
-
-#         for identifier in ids:
-#             taxid[key][f'{ids.index(identifier) + 1}.{identifier}'] = {'total': 0, 'annotation': 0, 'nan2nan / new': 0, 'nan2nan (dark)': 0}
-#             collateral[key][f'{ids.index(identifier) + 1}.{identifier}'] = {'total': 0, 'annotation': 0, 'nan2nan / new': 0, 'nan2nan (dark)': 0}
-
-#     list_nan2nan = list()
-
-#     cols = ["UniProt ID"] + ids + ["Organism"]
-#     taxid_outdf, collateral_outdf = pd.DataFrame(columns=cols), pd.DataFrame(columns=cols)
-
-#     nclusters = df_anno["#Cluster"].unique()
-#     for c in nclusters:
-        
-#         subdf_anno = df_anno[df_anno["#Cluster"] == c]
-#         subdf_safe = df_safe[df_safe["UniProt ID"].isin(subdf_anno["UniProt ID"])]
-
-#         dark_anno = subdf_anno[ids].apply(lambda col: col.isna().all()).to_dict()
-#         dark_safe = subdf_safe[ids].apply(lambda col: col.isna().all()).to_dict()
-        
-#         tmp_taxid, tmp_collateral = pd.DataFrame(columns=cols), pd.DataFrame(columns=cols)
-
-#         for i in ids:
-
-#             taxid['total'][f'{ids.index(i) + 1}.{i}']['total'] += len(subdf_anno[subdf_anno['UniProt ID'].isin(allp['UniProt ID'])])
-#             collateral['total'][f'{ids.index(i) + 1}.{i}']['total'] += len(subdf_anno[~subdf_anno['UniProt ID'].isin(allp['UniProt ID'])])
-
-#             if dark_anno[i] and dark_safe[i]:
-#                 proteins = subdf_anno[["UniProt ID", "Organism"]]
-#                 proteins_taxid = proteins[proteins['UniProt ID'].isin(allp['UniProt ID'])]
-#                 list_nan2nan.extend(proteins_taxid["UniProt ID"].tolist())
-
-#                 taxid['nan2nan'][f'{ids.index(i) + 1}.{i}']['nan2nan / new'] += len(proteins_taxid)
-#                 taxid['not annotated'][f'{ids.index(i) + 1}.{i}']['annotation'] += len(proteins_taxid)
-#                 taxid['nan2nan in dark clusters'][f'{ids.index(i) + 1}.{i}']['nan2nan (dark)'] += len(proteins_taxid)
-
-#                 collateral['nan2nan'][f'{ids.index(i) + 1}.{i}']['nan2nan / new'] += len(proteins[~proteins['UniProt ID'].isin(allp['UniProt ID'])])
-#                 collateral['not annotated'][f'{ids.index(i) + 1}.{i}']['annotation'] += len(proteins[~proteins['UniProt ID'].isin(allp['UniProt ID'])])
-#                 collateral['nan2nan in dark clusters'][f'{ids.index(i) + 1}.{i}']['nan2nan (dark)'] += len(proteins[~proteins['UniProt ID'].isin(allp['UniProt ID'])])
-#             else:
-#                 for index, row in subdf_safe.iterrows():
-
-#                     if row[i] == row[i]: 
-#                         if pd.isna(subdf_anno[subdf_anno["UniProt ID"] == row["UniProt ID"]][i].values[0]):
-#                             if row['UniProt ID'] in allp['UniProt ID'].tolist():
-#                                 taxid['new annotation by WASP'][f'{ids.index(i) + 1}.{i}']['nan2nan / new'] += 1
-#                             else:
-#                                 collateral['new annotation by WASP'][f'{ids.index(i) + 1}.{i}']['nan2nan / new'] += 1
-#                         else:
-#                             if row['UniProt ID'] in allp['UniProt ID'].tolist():
-#                                 taxid['previously annotated'][f'{ids.index(i) + 1}.{i}']['annotation'] += 1
-#                             else:
-#                                 collateral['previously annotated'][f'{ids.index(i) + 1}.{i}']['annotation'] += 1
-
-#                     if row['UniProt ID'] in allp['UniProt ID'].tolist():
-#                         tmp_taxid = pd.concat([tmp_taxid, subdf_safe[subdf_safe["UniProt ID"] == row["UniProt ID"]]])
-#                     else:
-#                         tmp_collateral = pd.concat([tmp_collateral, subdf_safe[subdf_safe["UniProt ID"] == row["UniProt ID"]]])
-
-#         taxid_outdf = pd.concat([taxid_outdf, tmp_taxid])
-#         collateral_outdf = pd.concat([collateral_outdf, tmp_collateral])
-
-#     # Extract just the base filenames to avoid double-pathing errors
-#     output_name = os.path.basename(output)
-#     nan_name = os.path.basename(nan)
-
-#     # Remove duplicates
-#     taxid_outdf = taxid_outdf.drop_duplicates()
-#     collateral_outdf = collateral_outdf.drop_duplicates()
-
-#     # Save the output files safely
-#     # Save outputs to Excel, appending a new sheet for each iteration
-#     taxid_excel = f"{wd}/taxid_{output_name}.xlsx"
-#     collateral_excel = f"{wd}/collateral_{output_name}.xlsx"
-
-#     # Helper function to handle the try/except logic for Excel appending
-#     def save_to_excel(df, filename, sheet_name):
-#         try:
-#             # Try appending to the existing file
-#             with pd.ExcelWriter(filename, engine='openpyxl', mode='a') as writer:
-#                 df.to_excel(writer, sheet_name=sheet_name, index=False)
-#         except (FileNotFoundError, ValueError):
-#             # If the file doesn't exist yet (first iteration), create it
-#             with pd.ExcelWriter(filename, engine='openpyxl') as writer:
-#                 df.to_excel(writer, sheet_name=sheet_name, index=False)
-
-#     save_to_excel(taxid_outdf, taxid_excel, f'Iteration_{iteration}')
-#     save_to_excel(collateral_outdf, collateral_excel, f'Iteration_{iteration}')
-    
-#     if len(list_nan2nan) > 0:
-#         # Use 'set' to avoid duplicates within the current iteration
-#         unique_nan = set(list_nan2nan)
-        
-#         # Open the specific nan_file provided in arguments in append mode
-#         with open(nan, "a") as f_out:
-#             for prot_id in unique_nan:
-#                 f_out.write(f"{prot_id}\n")
-        
-#         print(f"Iteration {iteration}: {len(unique_nan)} IDs appended to {nan}")
-
-#     return taxid, collateral
 
 def analyze_safe_results(df_anno, df_safe, ids, allp, output, wd, iteration, nan):
 
