@@ -1,7 +1,7 @@
 #!/usr/bin/env python3.10
 # @author: Giorgia Del Missier
 
-def get_besthits(input_file, n, evalue_threshold, bitscore_threshold):
+def get_besthits(input_file, n, evalue_threshold, bitscore_threshold, max_seq_id):
     """
     Extract the best hit for each query based on evalue and bitscore thresholds.
     
@@ -20,17 +20,19 @@ def get_besthits(input_file, n, evalue_threshold, bitscore_threshold):
         lines = f.readlines()
         for line in lines:
             line = line.strip().split()
-            query, target, evalue, bitscore = line[0], line[1], float(line[-2]), int(line[-1])
+            query, target, evalue, bitscore, fident = line[0], line[1], float(line[-2]), int(line[-1]), float(line[4])
             
             # Strip potential suffix from query and target identifiers
             query_stripped = query.split("-")[1] if "-" in query else query
             target_stripped = target.split("-")[1] if "-" in target else target
-            query_stripped = query.split(".pdb")[0] if "-" in query else query
-            target_stripped = target.split(".pdb")[0] if "-" in target else target
+            query_stripped = query.split(".pdb")[0] if ".pdb" in query else query
+            target_stripped = target.split(".pdb")[0] if ".pdb" in target else target
+            query_stripped = query.split(".cif")[0] if ".cif" in query else query
+            target_stripped = target.split(".cif")[0] if ".cif" in target else target
             
             # Ensure query and target are not the same and apply thresholds
             if query_stripped != target_stripped:
-                if evalue <= evalue_threshold and bitscore >= bitscore_threshold: 
+                if evalue <= evalue_threshold and bitscore >= bitscore_threshold and fident <= max_seq_id: 
                     # Store targets for each query
                     if query not in queries:
                         queries[query] = []

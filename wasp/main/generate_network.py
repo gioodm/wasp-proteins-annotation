@@ -66,12 +66,12 @@ def run_network_generation(input_file, input_bh_file, nan_file, max_hits):
 
     return G, all_queries, diff, clusters_sorted
 
-def save_network(G, diff, clusters_sorted, output, edgelist):
+def save_network(G, diff, clusters_sorted, output, edgelist, out_nan):
     """
     Save the network clusters and edge list to output files.
     """
     # Write nan2nan IDs to the output file
-    with open(output + "_nan.txt", "w") as foutnan:
+    with open(out_nan, "w") as foutnan:
         for i in diff:
             foutnan.write(i + "\n")
 

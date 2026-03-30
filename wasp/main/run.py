@@ -3,6 +3,9 @@
 
 import argparse, os, sys, subprocess, glob, shutil
 import numpy as np
+import networkx as nx
+import pandas as pd
+import json
 
 from .fs_besthits import get_besthits, save_besthits
 from .parse_fs import parse_m8, save_json
@@ -15,18 +18,19 @@ np.random.seed(0)
 
 def show_help():
     help_message = """
-Usage: python3 run.py [-h] -t taxid [-e evalue_threshold] [-b bitscore_threshold] [-n max_neighbours] [-s step] [-i iterations]
+Usage: python3 run.py [-h] -t taxid [-e evalue_threshold] [-b bitscore_threshold] [-n max_neighbours] [-s step] [-i iterations] [-m max_seq_id]
 
 WASP (Whole-proteome Annotation through Structural homology Pipeline) performs a "structural BLAST" using AlphaFold models to better annotate the target taxid proteome.
 Parameters:
 
     -h, --help                  show this help message and exit
-    -t, --taxid                  NCBI taxonomy identifier to be analysed (required)
-    -e, --evalue_thr             set the evalue threshold (default: 10e-10)
-    -b, --bitscore_thr           set the bitscore threshold (default: 50)
-    -n, --max_n                  set the max number of neighbours (default: 10)
-    -s, --step                   set step to add to max neighbours (n) in additional iterations (default: 10)
-    -i, --iters                  set number of iterations to perform (default: 3)
+    -t, --taxid                 NCBI taxonomy identifier to be analysed (required)
+    -e, --evalue_thr            set the evalue threshold (default: 10e-10)
+    -b, --bitscore_thr          set the bitscore threshold (default: 50)
+    -n, --max_n                 set the max number of neighbours (default: 10)
+    -s, --step                  set step to add to max neighbours (n) in additional iterations (default: 10)
+    -i, --iters                 set number of iterations to perform (default: 3)
+    -m, --max_seq_id            set maximum sequence identity (0.0 to 1.0) to exclude sequence homologs (default: 1.0)
 
 Examples:
     python3 run.py -t 559292
@@ -52,15 +56,22 @@ def main():
     parser.add_argument("-n", "--max_n", type=int, default=10)
     parser.add_argument("-s", "--step", type=int, default=10)
     parser.add_argument("-i", "--iters", type=int, default=3)
+    parser.add_argument("-m", "--max_seq_id", type=float, default=1.0)
 
     args = parser.parse_args()
+
+    system_tmp = os.environ.get("TMPDIR", "/tmp")
+    fs_tmp = f"{system_tmp}/fs_tmp_{args.taxid}"
+    os.makedirs(fs_tmp, exist_ok=True)
+    os.chmod(fs_tmp, 0o755)
 
     if args.help:
         show_help()
         sys.exit(0)
 
     # Set environment variable for foldseek
-    os.environ["PATH"] = f"{os.getcwd()}/foldseek/bin/:{os.environ['PATH']}"
+    #os.environ["PATH"] = f"{os.getcwd()}/foldseek/bin/:{os.environ['PATH']}"
+    os.environ["PATH"] = f"/rds/general/user/gd1122/projects/rlalab/live/results_benchmark/foldseek/bin/:{os.environ['PATH']}"
 
     # Check required commands
     check_command("foldseek")
@@ -73,13 +84,14 @@ def main():
     print(f"Selected max neighbours is: {args.max_n}")
     print(f"Selected step is: {args.step}")
     print(f"Selected number of iterations is: {args.iters}")
+    print(f"Selected maximum sequence identity threshold is: {args.max_seq_id}")
 
     ####---- DOWNLOADING FILES AND DATABASES ----####
 
     # Define directory names
-    db_dir = "foldseek_dbs"
-    prot_dir = "proteomes"
-    results_dir = "results"
+    db_dir = "/rds/general/user/gd1122/projects/rlalab/live/WASP_old/foldseek_dbs"
+    prot_dir = "/rds/general/user/gd1122/projects/rlalab/live/WASP_old/proteomes_benchmark"
+    results_dir = "/rds/general/user/gd1122/projects/rlalab/live/results_benchmark"
     taxid_dir = f"{results_dir}/{args.taxid}"
 
     # Create directories
@@ -136,13 +148,13 @@ def main():
     if not os.path.exists(f"{taxid_dir}/{args.taxid}.m8") or not os.path.exists(f"{taxid_dir}/{args.taxid}_bh.m8"):
         # Perform foldseek searches
         subprocess.run(["foldseek", "easy-search", "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,alntmscore,evalue,bits",
-                        f"{prot_dir}/{args.taxid}.tar", f"{db_dir}/afdb50sp{args.taxid}", f"{taxid_dir}/{args.taxid}.m8", "tmp", "--threads", "64"])
+                        f"{prot_dir}/{args.taxid}.tar", f"{db_dir}/afdb50sp{args.taxid}", f"{taxid_dir}/{args.taxid}.m8", fs_tmp, "--threads", "64"])
 
         subprocess.run(["foldseek", "easy-search", "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,alntmscore,evalue,bits",
-                        f"{prot_dir}/{args.taxid}.tar", f"{db_dir}/{args.taxid}", f"{taxid_dir}/{args.taxid}_norm.m8", "tmp", "--threads", "64",
+                        f"{prot_dir}/{args.taxid}.tar", f"{db_dir}/{args.taxid}", f"{taxid_dir}/{args.taxid}_norm.m8", fs_tmp, "--threads", "64",
                         "--exhaustive-search", "1", "--min-seq-id", "0.9"])
 
-        best_hits = get_besthits(f"{taxid_dir}/{args.taxid}.m8", 1, str(args.eval_thr), str(args.bits_thr))
+        best_hits = get_besthits(f"{taxid_dir}/{args.taxid}.m8", 1, args.eval_thr, args.bits_thr, args.max_seq_id)
         save_besthits(best_hits, f"{taxid_dir}/{args.taxid}_bh.txt")
 
         subprocess.run(["foldseek", "prefixid", f"{db_dir}/afdb50sp{args.taxid}_h", f"{db_dir}/afdb50sp{args.taxid}.lookup", "--tsv", "--threads", "1"])
@@ -156,14 +168,17 @@ def main():
         
         os.remove(f"{db_dir}/subset{args.taxid}.tsv")
 
-        subprocess.run(["foldseek", "search", f"{db_dir}/subdb{args.taxid}", f"{db_dir}/afdb50sp{args.taxid}", f"{taxid_dir}/{args.taxid}_bh", "tmp", "-a", "1", "--threads", "64"])
-        subprocess.run(["foldseek", "convertalis", "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,alntmscore,evalue,bits",
-                        f"{db_dir}/subdb{args.taxid}", f"{db_dir}/afdb50sp{args.taxid}", f"{taxid_dir}/{args.taxid}_bh", f"{taxid_dir}/{args.taxid}_bh.m8"])
+        search_bh_prefix = f"{taxid_dir}/{args.taxid}_bh"
+        subprocess.run(["foldseek", "search", f"{db_dir}/subdb{args.taxid}", f"{db_dir}/afdb50sp{args.taxid}", search_bh_prefix, fs_tmp,"-a", "1", "--threads", "64"], check=True)
 
-        subprocess.run(["foldseek", "search", f"{db_dir}/subdb{args.taxid}", f"{db_dir}/subdb{args.taxid}", f"{taxid_dir}/{args.taxid}_norm_bh", "tmp",
-                        "-a", "1", "--threads", "64", "--exhaustive-search", "1", "--min-seq-id", "0.9"])
-        subprocess.run(["foldseek", "convertalis", "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,alntmscore,evalue,bits",
-                        f"{db_dir}/subdb{args.taxid}", f"{db_dir}/subdb{args.taxid}", f"{taxid_dir}/{args.taxid}_norm_bh", f"{taxid_dir}/{args.taxid}_norm_bh.m8"])
+        subprocess.run(["foldseek", "convertalis", f"{db_dir}/subdb{args.taxid}", f"{db_dir}/afdb50sp{args.taxid}", search_bh_prefix, f"{search_bh_prefix}.m8",
+            "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,alntmscore,evalue,bits"], check=True)
+
+        search_norm_prefix = f"{taxid_dir}/{args.taxid}_norm_bh"
+        subprocess.run(["foldseek", "search", f"{db_dir}/subdb{args.taxid}", f"{db_dir}/subdb{args.taxid}", search_norm_prefix, fs_tmp, "-a", "1", "--threads", "64"], check=True)
+
+        subprocess.run(["foldseek", "convertalis", f"{db_dir}/subdb{args.taxid}", f"{db_dir}/subdb{args.taxid}", search_norm_prefix, f"{search_norm_prefix}.m8",
+            "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,alntmscore,evalue,bits"], check=True)
 
         # Clean up temporary files
         for path in glob.glob(os.path.join(db_dir, f"subdb{args.taxid}*")):
@@ -188,7 +203,7 @@ def main():
             for fname in files:
                 if not fname.endswith(".txt") and not fname.endswith(".m8"):
                     fpath = os.path.join(root, fname)
-            os.remove(fpath)
+                    os.remove(fpath)
     else:
         print("Foldseek results already generated")
 
@@ -196,12 +211,12 @@ def main():
     psize = subprocess.run(["tar", "-tvf", f"{prot_dir}/{args.taxid}.tar"], capture_output=True, text=True)
     psize = len([line for line in psize.stdout.splitlines() if line.endswith(".gz")])
 
-    queries = parse_m8(f"{taxid_dir}/{args.taxid}.m8", f"{taxid_dir}/{args.taxid}_norm.m8", args.eval_thr, args.bits_thr)
-    reciprocal_queries = parse_m8(f"{taxid_dir}/{args.taxid}_bh.m8", f"{taxid_dir}/{args.taxid}_norm_bh.m8", args.eval_thr, args.bits_thr)
+    queries = parse_m8(f"{taxid_dir}/{args.taxid}.m8", f"{taxid_dir}/{args.taxid}_norm.m8", args.eval_thr, args.bits_thr, args.max_seq_id)
+    reciprocal_queries = parse_m8(f"{taxid_dir}/{args.taxid}_bh.m8", f"{taxid_dir}/{args.taxid}_norm_bh.m8", args.eval_thr, args.bits_thr, args.max_seq_id)
     
     # Saving the results to JSON files
     save_json(queries, f"{taxid_dir}/{args.taxid}.json")
-    save_json(reciprocal_queries, f"{taxid_dir}/{args.taxid}_norm.json")
+    save_json(reciprocal_queries, f"{taxid_dir}/{args.taxid}_bh.json")
 
     print(f"Found significant hits for {len(queries)} out of {psize} proteins in the target organism")
 
@@ -218,10 +233,10 @@ def main():
         print(f"Selected max number of neighbours for iteration {j} is: {neighbours}\n")
 
         # Run the network generation
-        G, all_queries, diff, clusters_sorted = run_network_generation(f"{taxid_dir}/{args.taxid}.json", f"{taxid_dir}/{args.taxid}_norm.json", 
+        G, all_queries, diff, clusters_sorted = run_network_generation(f"{taxid_dir}/{args.taxid}.json", f"{taxid_dir}/{args.taxid}_bh.json", 
                                                                        f"{taxid_dir}/{args.taxid}_nan.txt", neighbours)
         # Save the network and cluster details
-        save_network(G, all_queries, diff, clusters_sorted, f"{taxid_dir}/{args.taxid}_clusters_iter{j}.txt", f"{taxid_dir}/{args.taxid}_edgelist_iter{j}.txt")
+        save_network(G, diff, clusters_sorted, f"{taxid_dir}/{args.taxid}_clusters_iter{j}.txt", f"{taxid_dir}/{args.taxid}_edgelist_iter{j}.txt", f"{taxid_dir}/{args.taxid}_nan.txt")
 
         print(f"{len(diff)} proteins in the target organism had no RBSH hits... trying again with increased number of neighbours")
 
@@ -236,7 +251,7 @@ def main():
         print("\nAnnotating network's nodes")
 
         fetch_annotations(f"{taxid_dir}/{args.taxid}_clusters_iter{j}.txt", f"{taxid_dir}/{args.taxid}_annotation_iter{j}.txt")
-
+        
         ####---- SAFE ENRICHMENT AND STATISTICS COMPUTATION ----####
 
         print("Performing SAFE analysis and computing statistics on new annotation\n")
@@ -251,7 +266,7 @@ def main():
             with open(f"{taxid_dir}/{args.taxid}_nan.txt", 'r') as file:
                 line_count = sum(1 for line in file)
 
-            if j < args.iter:
+            if j < args.iters:
                 print(f"Found {line_count} nan2nan IDs in total in the target proteome... proceeding to next iteration.")
             else:
                 print(f"Found {line_count} nan2nan IDs in total in the target proteome.")

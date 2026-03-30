@@ -3,7 +3,7 @@
 
 import json
 
-def parse_m8(fin, fnormalisation, eval_thr, bits_thr):
+def parse_m8(fin, fnormalisation, eval_thr, bits_thr, max_seq_id):
     """
     Parse Foldseek output files and normalize bitscores.
 
@@ -41,7 +41,7 @@ def parse_m8(fin, fnormalisation, eval_thr, bits_thr):
     with open(fin) as fs_in:
         for line in fs_in:
             line = line.strip().split()
-            query, target, evalue, bitscore = line[0], line[1], float(line[-2]), int(line[-1])
+            query, target, evalue, bitscore, fident = line[0], line[1], float(line[-2]), int(line[-1]), float(line[4])
 
             # Extract query and target IDs from headers
             query = query.split("-")[1] if "-" in query else query
@@ -52,7 +52,7 @@ def parse_m8(fin, fnormalisation, eval_thr, bits_thr):
             target = target.split(".pdb")[0] if ".pdb" in target else target
 
             if query != target:
-                if bitscore > bits_thr and evalue < eval_thr:
+                if bitscore > bits_thr and evalue < eval_thr and fident <= max_seq_id:
                     bitscore = round(bitscore / normalisation.get(query, 1), 3)
                     try:
                         if (target, evalue, bitscore) not in queries[query]:

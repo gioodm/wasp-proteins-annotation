@@ -24,11 +24,11 @@ from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import pdist, squareform
 from statsmodels.stats.multitest import fdrcorrection
 
-# from safe_io import *
-# from safe_extras import *
+from .safe_io import *
+from .safe_extras import *
 
-from . import safe_io
-from . import safe_extras
+#from . import safe_io
+#from . import safe_extras
 
 
 class SAFE:
