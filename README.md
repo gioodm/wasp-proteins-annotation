@@ -128,7 +128,7 @@ First, identify the NCBI taxonomy ID of your organism of interest. You can find 
 Once you have identified the taxid, run the pipeline as follows (e.g., for organism S. cerevisiae S288c, taxid: 559292):
 
 ```bash
-wasp-run 559292
+wasp-run -t 559292
 ```
 
 This requires `gsutil` installed.    
@@ -146,14 +146,14 @@ Additional parameters can be customised, including:
 Usage examples:
 
 ```sh
-wasp-run -e 1e-50 -b 200 -n 5 -i 5 559292
-wasp-run -s 5 559292
+wasp-run -e 1e-50 -b 200 -n 5 -i 5 -t 559292
+wasp-run -s 5 -t 559292
 ```
 
 To use a custom dataset (e.g., a newly sequenced genome or a set of proteins from different organisms), create a tarred folder containing the protein structures (`.cif.gz` or `.pdb.gz` format) and place it in a folder called `proteomes/` within the WASP folder - example folder in `example_files/price.tar`. Then run WASP with:
 
 ```bash
-wasp-run your_custom.tar
+wasp-run -t your_custom.tar
 ```
 
 An example of the final output can be found at `example_files/price_annotated.xlsx`
