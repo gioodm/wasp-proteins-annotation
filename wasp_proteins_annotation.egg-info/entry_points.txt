@@ -1,6 +1,0 @@
-[console_scripts]
-afdb-download = wasp.utils.fasta2pdb.afdb_downloader:main
-find-orphans = wasp.utils.gem_preprocessing.find_orphans:main
-run-rxn2code = wasp.utils.gem_preprocessing.rxn2code:main
-wasp-gem = wasp.gem.run_gem:main
-wasp-run = wasp.main.run:main
