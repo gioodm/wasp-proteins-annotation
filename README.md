@@ -141,6 +141,7 @@ Additional parameters can be customised, including:
 - `-n` max_neighbours: set the max number of neighbours (default: 10)
 - `-s` step: set step to add to max neighbours (n) in additional iterations (default: 10)
 - `-i` iterations: set number of iterations to perform (default: 3)
+- `-m` max sequence identity: set maximum sequence identity (0.0 to 1.0) to exclude sequence homologs (default: 1.0)
 
 Usage examples:
 
