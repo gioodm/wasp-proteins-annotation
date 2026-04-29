@@ -47,7 +47,7 @@ To ensure full reproducibility and easy setup, WASP packages all external depend
 Ensure you have Conda or Miniconda installed. This will automatically set up Python 3.10, Foldseek 8, gsutil, and the WASP pipeline in an isolated environment.
 ```bash
 # Clone the repository
-git clone [https://github.com/gioodm/wasp-proteins-annotation.git](https://github.com/gioodm/wasp-proteins-annotation.git)
+git clone https://github.com/gioodm/wasp-proteins-annotation.git
 cd wasp-proteins-annotation
 
 # Create the environment and install all dependencies
