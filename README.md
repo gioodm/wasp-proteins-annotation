@@ -41,80 +41,23 @@ If you find WASP helpful in your research, please cite us:
 
 ## 1. Installation
 
-### 1.1 External requirements
+To ensure full reproducibility and easy setup, WASP packages all external dependencies (Foldseek, gsutil) via Conda. 
 
-- Foldseek == 8
-- gsutil (for accessing AlphaFold DB)
-
-The manuscript results were obtained using Python 3.10.14 and Foldseek 8-ef4e960.
-
-### 1.2 Quickstart
-
-### ✅ Recommended: Install from PyPI
-
-1. **Create and activate a virtual environment**:
-
+### ✅ Recommended: Install via Conda
+Ensure you have Conda or Miniconda installed. This will automatically set up Python 3.10, Foldseek 8, gsutil, and the WASP pipeline in an isolated environment.
 ```bash
-python3 -m venv wasp-env
-source wasp-env/bin/activate
-```
+# Clone the repository
+git clone [https://github.com/gioodm/wasp-proteins-annotation.git](https://github.com/gioodm/wasp-proteins-annotation.git)
+cd wasp-proteins-annotation
 
-or 
+# Create the environment and install all dependencies
+conda env create -f environment.yml
 
-```bash
-conda create -n wasp-env python==3.10 -y
+# Activate the environment
 conda activate wasp-env
 ```
 
-2. **Install WASP**:
-
-```bash
-pip install wasp-proteins-annotation
-```
-
-Then, install Foldseek in the `/bin` of the project root. Follow the installation instructions at [Foldseek GitHub](https://github.com/steineggerlab/foldseek).
-
-Example for a Linux AVX2 build:
-
-```bash
-# Linux AVX2 build (check using: cat /proc/cpuinfo | grep avx2)
-wget https://mmseqs.com/foldseek/foldseek-linux-avx2.tar.gz; tar xvzf foldseek-linux-avx2.tar.gz; export PATH=$(pwd)/foldseek/bin/:$PATH
-
-```
-
-Install `gsutil` and initialise the gcloud CLI, following instructions for your machine at [Google Cloud Storage Documentation](https://cloud.google.com/storage/docs/gsutil_install).
-
-
-### 🛠️ For Development: Install from Source
-
-1. **Clone the repository**:
-
-```bash
-git clone https://github.com/gioodm/wasp-proteins-annotation.git
-cd WASP
-```
-
-2. **Create and activate a virtual environment**:
-
-```bash
-python3 -m venv wasp-env
-source wasp-env/bin/activate
-```
-
-or 
-
-```bash
-conda create -n WASP python==3.10 -y
-conda activate WASP
-```
-
-2. **Install the package locally**:
-
-```bash
-pip install .
-```
-
-Install Foldseek and `gsutil`.
+The manuscript results were obtained using Python 3.10.14 and Foldseek 8-ef4e960.
 
 
 ## 2. Usage

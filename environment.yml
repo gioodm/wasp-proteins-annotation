@@ -1,0 +1,12 @@
+name: wasp-env
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.10.*
+  - foldseek=8.ef4e960
+  - google-cloud-sdk
+  - pip
+  - pip:
+    - wasp-proteins-annotation

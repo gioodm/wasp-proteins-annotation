@@ -38,9 +38,12 @@ def check_command(command):
         sys.exit(1)
 
 def main():
+    if "-h" in sys.argv or "--help" in sys.argv:
+        show_help()
+        sys.exit(0)
 
     parser = argparse.ArgumentParser(description='GEM gap-filling script', add_help=False)
-    parser.add_argument("-h", "--help", action="store_true")
+
     parser.add_argument("-t", "--taxid", type=str, required=True)
     parser.add_argument("-g", "--gaps_file", type=str, required=True)
     parser.add_argument("-e", "--eval_thr", type=float, default=1e-05)
@@ -48,13 +51,11 @@ def main():
     parser.add_argument("-tm", "--tmscore_thr", type=float, default=0.5)
 
     args = parser.parse_args()
-
-    if args.help:
-        show_help()
-        sys.exit(0)
-
-    # Set environment variable for foldseek
-    os.environ["PATH"] = f"{os.getcwd()}/foldseek/bin/:{os.environ['PATH']}"
+    
+    system_tmp = os.environ.get("TMPDIR", "/tmp")
+    fs_tmp = f"{system_tmp}/fs_tmp_{args.taxid}"
+    os.makedirs(fs_tmp, exist_ok=True)
+    os.chmod(fs_tmp, 0o755)
 
     # Check required commands
     check_command("foldseek")

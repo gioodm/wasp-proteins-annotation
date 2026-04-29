@@ -47,9 +47,12 @@ def check_command(command):
         sys.exit(1)
 
 def main():
+    if "-h" in sys.argv or "--help" in sys.argv:
+        show_help()
+        sys.exit(0)
 
     parser = argparse.ArgumentParser(description="WASP Pipeline", add_help=False)
-    parser.add_argument("-h", "--help", action="store_true")
+
     parser.add_argument("-t", "--taxid", required=True)
     parser.add_argument("-e", "--eval_thr", type=float, default=1e-10)
     parser.add_argument("-b", "--bits_thr", type=int, default=50)
@@ -64,13 +67,6 @@ def main():
     fs_tmp = f"{system_tmp}/fs_tmp_{args.taxid}"
     os.makedirs(fs_tmp, exist_ok=True)
     os.chmod(fs_tmp, 0o755)
-
-    if args.help:
-        show_help()
-        sys.exit(0)
-
-    # Set environment variable for foldseek
-    os.environ["PATH"] = f"{os.getcwd()}/foldseek/bin/:{os.environ['PATH']}"
 
     # Check required commands
     check_command("foldseek")
