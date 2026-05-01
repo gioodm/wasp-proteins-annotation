@@ -2,6 +2,8 @@
 
 Welcome to the official repository for the paper *WASP: A pipeline for functional annotation based on AlphaFold structural models*!
 
+ciao ciao
+
 **WASP**, **W**hole-proteome **A**nnotation via **S**tructural-homology **P**rediction, is a python-based software designed for comprehensive organism annotation at the whole-proteome level based on structural homology.
 
 WASP is a user-friendly command-line tool that only requires the NCBI taxonomy ID of the organism of interest as an input. Using the computational speed of Foldseek [[1](https://doi.org/10.1038/s41587-023-01773-0)], WASP generates a graphical representation of reciprocal hits between the organism protein query and the AlphaFold database [[2](https://doi.org/10.1038/s41586-021-03819-2), [3](https://doi.org/10.1093/nar/gkab1061)], enabling downstream robust functional enrichment and statistical testing. WASP annotates uncharacterised proteins using multiple functional descriptors, including GO terms, Pfam domains, PANTHER family classification and CATH superfamilies, Rhea IDs and EC numbers. Additionally, WASP provides a module to map native proteins to orphan reactions in genome-scale models based on structural homology.
