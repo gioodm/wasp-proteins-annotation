@@ -2,6 +2,7 @@
 # @author Giorgia Del Missier
 
 import argparse, os, sys, subprocess, glob, shutil
+from pathlib import Path
 import numpy as np
 import networkx as nx
 import pandas as pd
@@ -18,13 +19,15 @@ np.random.seed(0)
 
 def show_help():
     help_message = """
-Usage: python3 run.py [-h] -t taxid [-e evalue_threshold] [-b bitscore_threshold] [-n max_neighbours] [-s step] [-i iterations] [-m max_seq_id]
+Usage: python3 run.py [-h] (-t taxid | -f proteins.fasta | --structures proteins.tar) [-e evalue_threshold] [-b bitscore_threshold] [-n max_neighbours] [-s step] [-i iterations] [-m max_seq_id]
 
 WASP (Whole-proteome Annotation through Structural homology Pipeline) performs a "structural BLAST" using AlphaFold models to better annotate the target taxid proteome.
 Parameters:
 
     -h, --help                  show this help message and exit
-    -t, --taxid                 NCBI taxonomy identifier to be analysed (required)
+    -t, --taxid                 NCBI taxonomy identifier to be analysed
+    -f, --fasta                 FASTA file to analyse using Foldseek ProstT5
+        --structures            tar archive containing .cif.gz or .pdb.gz structures
     -e, --evalue_thr            set the evalue threshold (default: 10e-10)
     -b, --bitscore_thr          set the bitscore threshold (default: 50)
     -n, --max_n                 set the max number of neighbours (default: 10)
@@ -36,6 +39,8 @@ Examples:
     python3 run.py -t 559292
     python3 run.py -t 559292 -e 1e-50 -b 200 -n 5 -i 5
     python3 run.py -t 559292 -s 5
+    python3 run.py -f proteins.fasta
+    python3 run.py --structures proteins.tar
     """
     print(help_message)
  
@@ -53,7 +58,10 @@ def main():
 
     parser = argparse.ArgumentParser(description="WASP Pipeline", add_help=False)
 
-    parser.add_argument("-t", "--taxid", required=True)
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("-t", "--taxid")
+    input_group.add_argument("-f", "--fasta", type=Path)
+    input_group.add_argument("--structures", type=Path)
     parser.add_argument("-e", "--eval_thr", type=float, default=1e-10)
     parser.add_argument("-b", "--bits_thr", type=int, default=50)
     parser.add_argument("-n", "--max_n", type=int, default=10)
@@ -63,17 +71,31 @@ def main():
 
     args = parser.parse_args()
 
+    input_file = args.fasta or args.structures
+    if input_file and not input_file.is_file():
+        parser.error(f"Input file not found: {input_file}")
+
+    input_id = args.taxid or input_file.stem
+    is_fasta_input = args.fasta is not None
+    is_structure_input = args.structures is not None
+
     system_tmp = os.environ.get("TMPDIR", "/tmp")
-    fs_tmp = f"{system_tmp}/fs_tmp_{args.taxid}"
+    fs_tmp = f"{system_tmp}/fs_tmp_{input_id}"
     os.makedirs(fs_tmp, exist_ok=True)
     os.chmod(fs_tmp, 0o755)
 
     # Check required commands
     check_command("foldseek")
-    check_command("gsutil")
+    if not (is_fasta_input or is_structure_input):
+        check_command("gsutil")
 
     print("Setting required variables:")
-    print(f"\nSelected taxid is: {args.taxid}")
+    if is_fasta_input:
+        print(f"\nSelected FASTA file is: {args.fasta}")
+    elif is_structure_input:
+        print(f"\nSelected structure archive is: {args.structures}")
+    else:
+        print(f"\nSelected taxid is: {args.taxid}")
     print(f"Selected evalue threshold is: {args.eval_thr}")
     print(f"Selected bitscore threshold is: {args.bits_thr}")
     print(f"Selected max neighbours is: {args.max_n}")
@@ -87,7 +109,11 @@ def main():
     db_dir = "foldseek_dbs"
     prot_dir = "proteomes"
     results_dir = "results"
-    taxid_dir = f"{results_dir}/{args.taxid}"
+    taxid_dir = f"{results_dir}/{input_id}"
+    protein_input = str(input_file) if (is_fasta_input or is_structure_input) else f"{prot_dir}/{input_id}.tar"
+    source_db = f"{db_dir}/{input_id}"
+    combined_db = f"{db_dir}/afdb50sp{input_id}"
+    prostt5_weights = f"{db_dir}/prostt5"
 
     # Create directories
     for directory in [db_dir, prot_dir, results_dir, taxid_dir, f"{taxid_dir}/SAFE"]:
@@ -109,86 +135,97 @@ def main():
         print("Foldseek databases already downloaded")
 
     # Check if results already exist
-    if all(os.path.exists(f"{taxid_dir}/{args.taxid}{suffix}.m8") for suffix in ["", "_bh", "_norm", "_norm_bh"]):
-        print("AlphaFold models of selected organism already downloaded and Foldseek results already generated")
+    if all(os.path.exists(f"{taxid_dir}/{input_id}{suffix}.m8") for suffix in ["", "_bh", "_norm", "_norm_bh"]):
+        print("Input data already prepared and Foldseek results already generated")
     else:
-        # Download and prepare proteome
-        if not os.path.exists(f"{prot_dir}/{args.taxid}.tar"):
-            os.makedirs(f"{prot_dir}/{args.taxid}", exist_ok=True)
-            subprocess.run(["gsutil", "-m", "cp", f"gs://public-datasets-deepmind-alphafold-v4/proteomes/proteome-tax_id-{args.taxid}-*_v4.tar", prot_dir])
-            
-            for f in os.listdir(prot_dir):
-                if f.startswith(f"proteome-tax_id-{args.taxid}") and f.endswith("_v4.tar"):
-                    subprocess.run(["tar", "-xf", f"{prot_dir}/{f}", "-C", f"{prot_dir}/{args.taxid}"])
-                    os.remove(f"{prot_dir}/{f}")
-            
-            for f in os.listdir(f"{prot_dir}/{args.taxid}"):
-                if f.endswith(".json.gz"):
-                    os.remove(f"{prot_dir}/{args.taxid}/{f}")
-            
-            subprocess.run(["tar", "-cf", f"{prot_dir}/{args.taxid}.tar", "-C", prot_dir, args.taxid])
-            subprocess.run(["rm", "-r", f"{prot_dir}/{args.taxid}"])
-        if not os.path.exists(f"{db_dir}/afdb50sp{args.taxid}"):
-            subprocess.run(["foldseek", "createdb", f"{prot_dir}/{args.taxid}.tar", f"{db_dir}/{args.taxid}"])
+        if is_fasta_input:
+            if not os.path.exists(prostt5_weights):
+                subprocess.run(["foldseek", "databases", "ProstT5", prostt5_weights, fs_tmp], check=True)
+            if not os.path.exists(source_db):
+                subprocess.run(["foldseek", "createdb", protein_input, source_db, "--prostt5-model", prostt5_weights], check=True)
+        elif not is_structure_input:
+            # Download and prepare the AlphaFold proteome.
+            if not os.path.exists(protein_input):
+                os.makedirs(f"{prot_dir}/{input_id}", exist_ok=True)
+                subprocess.run(["gsutil", "-m", "cp", f"gs://public-datasets-deepmind-alphafold-v4/proteomes/proteome-tax_id-{input_id}-*_v4.tar", prot_dir], check=True)
+
+                for filename in os.listdir(prot_dir):
+                    if filename.startswith(f"proteome-tax_id-{input_id}") and filename.endswith("_v4.tar"):
+                        subprocess.run(["tar", "-xf", f"{prot_dir}/{filename}", "-C", f"{prot_dir}/{input_id}"], check=True)
+                        os.remove(f"{prot_dir}/{filename}")
+
+                for filename in os.listdir(f"{prot_dir}/{input_id}"):
+                    if filename.endswith(".json.gz"):
+                        os.remove(f"{prot_dir}/{input_id}/{filename}")
+
+                subprocess.run(["tar", "-cf", protein_input, "-C", prot_dir, input_id], check=True)
+                shutil.rmtree(f"{prot_dir}/{input_id}")
+            if not os.path.exists(source_db):
+                subprocess.run(["foldseek", "createdb", protein_input, source_db], check=True)
+
+        if not os.path.exists(combined_db):
 
             for suffix in ["", "_h", "_ss", "_ca"]:
-                subprocess.run(["foldseek", "concatdbs", f"{db_dir}/afdb50sp{suffix}", f"{db_dir}/{args.taxid}{suffix}", f"{db_dir}/afdb50sp{args.taxid}{suffix}"])
+                subprocess.run(["foldseek", "concatdbs", f"{db_dir}/afdb50sp{suffix}", f"{source_db}{suffix}", f"{combined_db}{suffix}"], check=True)
         else:
-            print("AlphaFold models of selected organism already downloaded")
+            print("Input database already prepared")
 
     ####---- RECIPROCAL BEST STRUCTURE HITS SEARCH ----####
 
     print("\nPerforming Reciprocal Best Structural Hits search:")
 
-    if not os.path.exists(f"{taxid_dir}/{args.taxid}.m8") or not os.path.exists(f"{taxid_dir}/{args.taxid}_bh.m8"):
+    if not os.path.exists(f"{taxid_dir}/{input_id}.m8") or not os.path.exists(f"{taxid_dir}/{input_id}_bh.m8"):
         # Perform foldseek searches
+        prostt5_options = ["--prostt5-model", prostt5_weights] if is_fasta_input else []
         subprocess.run(["foldseek", "easy-search", "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,alntmscore,evalue,bits",
-                        f"{prot_dir}/{args.taxid}.tar", f"{db_dir}/afdb50sp{args.taxid}", f"{taxid_dir}/{args.taxid}.m8", fs_tmp, "--threads", "64"])
+                        protein_input, combined_db, f"{taxid_dir}/{input_id}.m8", fs_tmp, "--threads", "64", *prostt5_options], check=True)
 
         subprocess.run(["foldseek", "easy-search", "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,alntmscore,evalue,bits",
-                        f"{prot_dir}/{args.taxid}.tar", f"{db_dir}/{args.taxid}", f"{taxid_dir}/{args.taxid}_norm.m8", fs_tmp, "--threads", "64",
-                        "--exhaustive-search", "1", "--min-seq-id", "0.9"])
+                        protein_input, source_db, f"{taxid_dir}/{input_id}_norm.m8", fs_tmp, "--threads", "64",
+                        "--exhaustive-search", "1", "--min-seq-id", "0.9", *prostt5_options], check=True)
 
-        best_hits = get_besthits(f"{taxid_dir}/{args.taxid}.m8", 1, args.eval_thr, args.bits_thr, args.max_seq_id)
-        save_besthits(best_hits, f"{taxid_dir}/{args.taxid}_bh.txt")
+        best_hits = get_besthits(f"{taxid_dir}/{input_id}.m8", 1, args.eval_thr, args.bits_thr, args.max_seq_id)
+        save_besthits(best_hits, f"{taxid_dir}/{input_id}_bh.txt")
 
-        subprocess.run(["foldseek", "prefixid", f"{db_dir}/afdb50sp{args.taxid}_h", f"{db_dir}/afdb50sp{args.taxid}.lookup", "--tsv", "--threads", "1"])
+        subprocess.run(["foldseek", "prefixid", f"{combined_db}_h", f"{combined_db}.lookup", "--tsv", "--threads", "1"], check=True)
         
-        awk_command = ["awk", "NR == FNR {f[$1] = $1; next} $2 in f {print $1}", f"{taxid_dir}/{args.taxid}_bh.txt", f"{db_dir}/afdb50sp{args.taxid}.lookup"]
-        with open(f"{db_dir}/subset{args.taxid}.tsv", "w") as output_file:
+        subset_tsv = f"{db_dir}/subset{input_id}.tsv"
+        subset_db = f"{db_dir}/subdb{input_id}"
+        awk_command = ["awk", "NR == FNR {f[$1] = $1; next} $2 in f {print $1}", f"{taxid_dir}/{input_id}_bh.txt", f"{combined_db}.lookup"]
+        with open(subset_tsv, "w") as output_file:
             subprocess.run(awk_command, stdout=output_file, check=True)
 
         for suffix in ["", "_ss", "_ca"]:
-            subprocess.run(["foldseek", "createsubdb", f"{db_dir}/subset{args.taxid}.tsv", f"{db_dir}/afdb50sp{args.taxid}{suffix}", f"{db_dir}/subdb{args.taxid}{suffix}"])
+            subprocess.run(["foldseek", "createsubdb", subset_tsv, f"{combined_db}{suffix}", f"{subset_db}{suffix}"], check=True)
         
-        os.remove(f"{db_dir}/subset{args.taxid}.tsv")
+        os.remove(subset_tsv)
 
-        search_bh_prefix = f"{taxid_dir}/{args.taxid}_bh"
-        subprocess.run(["foldseek", "search", f"{db_dir}/subdb{args.taxid}", f"{db_dir}/afdb50sp{args.taxid}", search_bh_prefix, fs_tmp,"-a", "1", "--threads", "64"], check=True)
+        search_bh_prefix = f"{taxid_dir}/{input_id}_bh"
+        subprocess.run(["foldseek", "search", subset_db, combined_db, search_bh_prefix, fs_tmp,"-a", "1", "--threads", "64"], check=True)
 
-        subprocess.run(["foldseek", "convertalis", f"{db_dir}/subdb{args.taxid}", f"{db_dir}/afdb50sp{args.taxid}", search_bh_prefix, f"{search_bh_prefix}.m8",
+        subprocess.run(["foldseek", "convertalis", subset_db, combined_db, search_bh_prefix, f"{search_bh_prefix}.m8",
             "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,alntmscore,evalue,bits"], check=True)
 
-        search_norm_prefix = f"{taxid_dir}/{args.taxid}_norm_bh"
-        subprocess.run(["foldseek", "search", f"{db_dir}/subdb{args.taxid}", f"{db_dir}/subdb{args.taxid}", search_norm_prefix, fs_tmp, "-a", "1", "--threads", "64"], check=True)
+        search_norm_prefix = f"{taxid_dir}/{input_id}_norm_bh"
+        subprocess.run(["foldseek", "search", subset_db, subset_db, search_norm_prefix, fs_tmp, "-a", "1", "--threads", "64"], check=True)
 
-        subprocess.run(["foldseek", "convertalis", f"{db_dir}/subdb{args.taxid}", f"{db_dir}/subdb{args.taxid}", search_norm_prefix, f"{search_norm_prefix}.m8",
+        subprocess.run(["foldseek", "convertalis", subset_db, subset_db, search_norm_prefix, f"{search_norm_prefix}.m8",
             "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,alntmscore,evalue,bits"], check=True)
 
         # Clean up temporary files
-        for path in glob.glob(os.path.join(db_dir, f"subdb{args.taxid}*")):
+        for path in glob.glob(os.path.join(db_dir, f"subdb{input_id}*")):
             if os.path.isfile(path):
                 os.remove(path)
             elif os.path.isdir(path):
                 shutil.rmtree(path)
 
-        for path in glob.glob(os.path.join(db_dir, f"afdb50sp{args.taxid}*")):
+        for path in glob.glob(os.path.join(db_dir, f"afdb50sp{input_id}*")):
             if os.path.isfile(path):
                 os.remove(path)
             elif os.path.isdir(path):
                 shutil.rmtree(path)
 
-        for path in glob.glob(os.path.join(db_dir, f"{args.taxid}*")):
+        for path in glob.glob(os.path.join(db_dir, f"{input_id}*")):
             if os.path.isfile(path):
                 os.remove(path)
             elif os.path.isdir(path):
@@ -202,20 +239,24 @@ def main():
     else:
         print("Foldseek results already generated")
 
-    # Count the number of proteins in the proteome
-    psize = subprocess.run(["tar", "-tvf", f"{prot_dir}/{args.taxid}.tar"], capture_output=True, text=True)
-    psize = len([line for line in psize.stdout.splitlines() if line.endswith(".gz")])
+    # Count the input proteins for the search summary.
+    if is_fasta_input:
+        with args.fasta.open() as fasta_file:
+            psize = sum(line.startswith(">") for line in fasta_file)
+    else:
+        psize = subprocess.run(["tar", "-tvf", protein_input], capture_output=True, text=True, check=True)
+        psize = len([line for line in psize.stdout.splitlines() if line.endswith(".gz")])
 
-    queries = parse_m8(f"{taxid_dir}/{args.taxid}.m8", f"{taxid_dir}/{args.taxid}_norm.m8", args.eval_thr, args.bits_thr, args.max_seq_id)
-    reciprocal_queries = parse_m8(f"{taxid_dir}/{args.taxid}_bh.m8", f"{taxid_dir}/{args.taxid}_norm_bh.m8", args.eval_thr, args.bits_thr, args.max_seq_id)
+    queries = parse_m8(f"{taxid_dir}/{input_id}.m8", f"{taxid_dir}/{input_id}_norm.m8", args.eval_thr, args.bits_thr, args.max_seq_id)
+    reciprocal_queries = parse_m8(f"{taxid_dir}/{input_id}_bh.m8", f"{taxid_dir}/{input_id}_norm_bh.m8", args.eval_thr, args.bits_thr, args.max_seq_id)
     
     # Saving the results to JSON files
-    save_json(queries, f"{taxid_dir}/{args.taxid}.json")
-    save_json(reciprocal_queries, f"{taxid_dir}/{args.taxid}_bh.json")
+    save_json(queries, f"{taxid_dir}/{input_id}.json")
+    save_json(reciprocal_queries, f"{taxid_dir}/{input_id}_bh.json")
 
     print(f"Found significant hits for {len(queries)} out of {psize} proteins in the target organism")
 
-    open(f"{taxid_dir}/{args.taxid}_nan.txt", "w").close()
+    open(f"{taxid_dir}/{input_id}_nan.txt", "w").close()
 
     for j in range(1, args.iters + 1):
         print(f"\nPerforming iteration {j}")
@@ -228,10 +269,10 @@ def main():
         print(f"Selected max number of neighbours for iteration {j} is: {neighbours}\n")
 
         # Run the network generation
-        G, all_queries, diff, clusters_sorted = run_network_generation(f"{taxid_dir}/{args.taxid}.json", f"{taxid_dir}/{args.taxid}_bh.json", 
-                                                                       f"{taxid_dir}/{args.taxid}_nan.txt", neighbours)
+        G, all_queries, diff, clusters_sorted = run_network_generation(f"{taxid_dir}/{input_id}.json", f"{taxid_dir}/{input_id}_bh.json",
+                                           f"{taxid_dir}/{input_id}_nan.txt", neighbours)
         # Save the network and cluster details
-        save_network(G, diff, clusters_sorted, f"{taxid_dir}/{args.taxid}_clusters_iter{j}.txt", f"{taxid_dir}/{args.taxid}_edgelist_iter{j}.txt", f"{taxid_dir}/{args.taxid}_nan.txt")
+        save_network(G, diff, clusters_sorted, f"{taxid_dir}/{input_id}_clusters_iter{j}.txt", f"{taxid_dir}/{input_id}_edgelist_iter{j}.txt", f"{taxid_dir}/{input_id}_nan.txt")
 
         print(f"{len(diff)} proteins in the target organism had no RBSH hits... trying again with increased number of neighbours")
 
@@ -245,20 +286,20 @@ def main():
 
         print("\nAnnotating network's nodes")
 
-        fetch_annotations(f"{taxid_dir}/{args.taxid}_clusters_iter{j}.txt", f"{taxid_dir}/{args.taxid}_annotation_iter{j}.txt")
+        fetch_annotations(f"{taxid_dir}/{input_id}_clusters_iter{j}.txt", f"{taxid_dir}/{input_id}_annotation_iter{j}.txt")
         
         ####---- SAFE ENRICHMENT AND STATISTICS COMPUTATION ----####
 
         print("Performing SAFE analysis and computing statistics on new annotation\n")
 
-        run_safe_analysis(f"{taxid_dir}/{args.taxid}_annotation_iter{j}.txt", taxid_dir, f"{args.taxid}_edgelist_iter{j}.txt", j, f"{taxid_dir}/{args.taxid}_norm.m8", 
-                          f"{taxid_dir}/{args.taxid}_NEWannotation", f"{taxid_dir}/{args.taxid}_barcharts", f"{taxid_dir}/{args.taxid}_nan.txt")
+        run_safe_analysis(f"{taxid_dir}/{input_id}_annotation_iter{j}.txt", taxid_dir, f"{input_id}_edgelist_iter{j}.txt", j, f"{taxid_dir}/{input_id}_norm.m8",
+                  f"{taxid_dir}/{input_id}_NEWannotation", f"{taxid_dir}/{input_id}_barcharts", f"{taxid_dir}/{input_id}_nan.txt")
 
-        if os.path.getsize(f"{taxid_dir}/{args.taxid}_nan.txt") == 0:
+        if os.path.getsize(f"{taxid_dir}/{input_id}_nan.txt") == 0:
             print(f"All nan2nan proteins have been annotated. Stopping at iteration {j}.")
             break
         else:
-            with open(f"{taxid_dir}/{args.taxid}_nan.txt", 'r') as file:
+            with open(f"{taxid_dir}/{input_id}_nan.txt", 'r') as file:
                 line_count = sum(1 for line in file)
 
             if j < args.iters:
