@@ -27,7 +27,7 @@ Parameters:
     -h, --help                  show this help message and exit
     -t, --taxid                 NCBI taxonomy identifier to be analysed
     -f, --fasta                 FASTA file to analyse using Foldseek ProstT5
-        --structures            tar archive containing .cif.gz or .pdb.gz structures
+    -p, --structures            tar archive containing .cif.gz or .pdb.gz structures
     -e, --evalue_thr            set the evalue threshold (default: 10e-10)
     -b, --bitscore_thr          set the bitscore threshold (default: 50)
     -n, --max_n                 set the max number of neighbours (default: 10)
@@ -61,7 +61,7 @@ def main():
     input_group = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument("-t", "--taxid")
     input_group.add_argument("-f", "--fasta", type=Path)
-    input_group.add_argument("--structures", type=Path)
+    input_group.add_argument("-p", "--structures", type=Path)
     parser.add_argument("-e", "--eval_thr", type=float, default=1e-10)
     parser.add_argument("-b", "--bits_thr", type=int, default=50)
     parser.add_argument("-n", "--max_n", type=int, default=10)
@@ -78,6 +78,8 @@ def main():
     input_id = args.taxid or input_file.stem
     is_fasta_input = args.fasta is not None
     is_structure_input = args.structures is not None
+    # FASTA/ProstT5 input has no coordinate (_ca) database to concatenate or subset.
+    ca_suffixes = [] if is_fasta_input else ["_ca"]
 
     system_tmp = os.environ.get("TMPDIR", "/tmp")
     fs_tmp = f"{system_tmp}/fs_tmp_{input_id}"
@@ -164,8 +166,7 @@ def main():
                 subprocess.run(["foldseek", "createdb", protein_input, source_db], check=True)
 
         if not os.path.exists(combined_db):
-
-            for suffix in ["", "_h", "_ss", "_ca"]:
+            for suffix in ["", "_h", "_ss"] + ca_suffixes:
                 subprocess.run(["foldseek", "concatdbs", f"{db_dir}/afdb50sp{suffix}", f"{source_db}{suffix}", f"{combined_db}{suffix}"], check=True)
         else:
             print("Input database already prepared")
@@ -195,7 +196,7 @@ def main():
         with open(subset_tsv, "w") as output_file:
             subprocess.run(awk_command, stdout=output_file, check=True)
 
-        for suffix in ["", "_ss", "_ca"]:
+        for suffix in ["", "_ss"] + ca_suffixes:
             subprocess.run(["foldseek", "createsubdb", subset_tsv, f"{combined_db}{suffix}", f"{subset_db}{suffix}"], check=True)
         
         os.remove(subset_tsv)
