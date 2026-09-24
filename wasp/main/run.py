@@ -178,10 +178,10 @@ def main():
     if not os.path.exists(f"{taxid_dir}/{input_id}.m8") or not os.path.exists(f"{taxid_dir}/{input_id}_bh.m8"):
         # Perform foldseek searches
         prostt5_options = ["--prostt5-model", prostt5_weights] if is_fasta_input else []
-        subprocess.run(["foldseek", "easy-search", "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,alntmscore,evalue,bits",
+        subprocess.run(["foldseek", "easy-search", "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,evalue,bits",
                         protein_input, combined_db, f"{taxid_dir}/{input_id}.m8", fs_tmp, "--threads", "64", *prostt5_options], check=True)
 
-        subprocess.run(["foldseek", "easy-search", "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,alntmscore,evalue,bits",
+        subprocess.run(["foldseek", "easy-search", "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,evalue,bits",
                         protein_input, source_db, f"{taxid_dir}/{input_id}_norm.m8", fs_tmp, "--threads", "64",
                         "--exhaustive-search", "1", "--min-seq-id", "0.9", *prostt5_options], check=True)
 
@@ -205,13 +205,13 @@ def main():
         subprocess.run(["foldseek", "search", subset_db, combined_db, search_bh_prefix, fs_tmp,"-a", "1", "--threads", "64"], check=True)
 
         subprocess.run(["foldseek", "convertalis", subset_db, combined_db, search_bh_prefix, f"{search_bh_prefix}.m8",
-            "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,alntmscore,evalue,bits"], check=True)
+            "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,evalue,bits"], check=True)
 
         search_norm_prefix = f"{taxid_dir}/{input_id}_norm_bh"
         subprocess.run(["foldseek", "search", subset_db, subset_db, search_norm_prefix, fs_tmp, "-a", "1", "--threads", "64"], check=True)
 
         subprocess.run(["foldseek", "convertalis", subset_db, subset_db, search_norm_prefix, f"{search_norm_prefix}.m8",
-            "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,alntmscore,evalue,bits"], check=True)
+            "--format-output", "query,target,qlen,tlen,fident,alnlen,mismatch,qstart,qend,tstart,tend,evalue,bits"], check=True)
 
         # Clean up temporary files
         for path in glob.glob(os.path.join(db_dir, f"subdb{input_id}*")):
