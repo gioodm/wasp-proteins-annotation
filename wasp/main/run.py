@@ -143,8 +143,6 @@ def main():
         if is_fasta_input:
             if not os.path.exists(prostt5_weights):
                 subprocess.run(["foldseek", "databases", "ProstT5", prostt5_weights, fs_tmp], check=True)
-            if not os.path.exists(source_db):
-                subprocess.run(["foldseek", "createdb", protein_input, source_db, "--prostt5-model", prostt5_weights], check=True)
         elif not is_structure_input:
             # Download and prepare the AlphaFold proteome.
             if not os.path.exists(protein_input):
@@ -162,14 +160,14 @@ def main():
 
                 subprocess.run(["tar", "-cf", protein_input, "-C", prot_dir, input_id], check=True)
                 shutil.rmtree(f"{prot_dir}/{input_id}")
-            if not os.path.exists(source_db):
-                subprocess.run(["foldseek", "createdb", protein_input, source_db], check=True)
 
-        if not os.path.exists(combined_db):
-            for suffix in ["", "_h", "_ss"] + ca_suffixes:
+        if not os.path.exists(source_db):
+            prostt5_options = ["--prostt5-model", prostt5_weights] if is_fasta_input else []
+            subprocess.run(["foldseek", "createdb", protein_input, source_db, *prostt5_options], check=True)
+
+        for suffix in ["", "_h", "_ss"] + ca_suffixes:
+            if not os.path.exists(f"{combined_db}{suffix}"):
                 subprocess.run(["foldseek", "concatdbs", f"{db_dir}/afdb50sp{suffix}", f"{source_db}{suffix}", f"{combined_db}{suffix}"], check=True)
-        else:
-            print("Input database already prepared")
 
     ####---- RECIPROCAL BEST STRUCTURE HITS SEARCH ----####
 
