@@ -46,7 +46,7 @@ If you find WASP helpful in your research, please cite us:
 To ensure full reproducibility and easy setup, WASP packages all external dependencies (Foldseek, gsutil) via Conda. 
 
 ### ✅ Recommended: Install via Conda
-Ensure you have Conda or Miniconda installed. This will automatically set up Python 3.10, Foldseek 8, gsutil, and the WASP pipeline in an isolated environment.
+Ensure you have Conda or Miniconda installed. This will automatically set up Python 3.10, Foldseek 9 or later, gsutil, and the WASP pipeline in an isolated environment.
 ```bash
 # Clone the repository
 git clone https://github.com/gioodm/wasp-proteins-annotation.git
@@ -79,6 +79,14 @@ wasp-run -t 559292
 This requires `gsutil` installed.    
 Note: On the first run, the AlphaFold DB clustered at 50% will need to be downloaded using Foldseek. This can take some time depending on your machine's performance and internet speed. Ensure you have sufficient storage space to host the database. After the initial setup, WASP annotation will take up to 3 hours for iteration for a proteome of approximately 6000 proteins.
 
+To annotate proteins without predicted structures, provide a FASTA file instead. WASP downloads the ProstT5 weights required by Foldseek on the first FASTA run and performs a structure-based sequence search. This mode does not require `gsutil`:
+
+```bash
+wasp-run --fasta proteins.fasta
+```
+
+Use exactly one input option: `--taxid`, `--fasta`, or `--structures`. The output directory is named after the input filename without its extension when using a FASTA file or structure archive.
+
 Additional parameters can be customised, including:
 
 - `-e` evalue_threshold: set the evalue threshold (default: 10e-10)
@@ -93,15 +101,15 @@ Usage examples:
 ```sh
 wasp-run -e 1e-50 -b 200 -n 5 -i 5 -t 559292
 wasp-run -s 5 -t 559292
+wasp-run -f proteins.fasta -e 1e-50 -b 200
 ```
 
-To use a custom dataset (e.g., a newly sequenced genome or a set of proteins from different organisms), create a tarred folder containing the protein structures (`.cif.gz` or `.pdb.gz` format) and place it in a folder called `proteomes/` within the WASP folder - example folder in `example_files/price.tar`. Then run WASP with:
+To use a custom structural dataset (e.g., a newly sequenced genome or a set of proteins from different organisms), create a tar archive containing protein structures in `.cif.gz` or `.pdb.gz` format. Pass its path with `--structures`; no `gsutil` download is performed:
 
 ```bash
-wasp-run -t your_custom.tar
+wasp-run -p proteins.tar
+# equivalent to: wasp-run --structures proteins.tar
 ```
-
-An example of the final output can be found at `example_files/price_annotated.xlsx`
 
 ### 2.2 GEM gap-filling module
 

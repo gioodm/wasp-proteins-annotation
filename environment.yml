@@ -5,7 +5,7 @@ channels:
   - defaults
 dependencies:
   - python=3.10.*
-  - foldseek=8.ef4e960
+  - foldseek>=9
   - google-cloud-sdk
   - pip
   - pip:
