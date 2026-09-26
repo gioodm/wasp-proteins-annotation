@@ -82,7 +82,8 @@ Note: On the first run, the AlphaFold DB clustered at 50% will need to be downlo
 To annotate proteins without predicted structures, provide a FASTA file instead. WASP downloads the ProstT5 weights required by Foldseek on the first FASTA run and performs a structure-based sequence search. This mode does not require `gsutil`:
 
 ```bash
-wasp-run --fasta proteins.fasta
+wasp-run -f proteins.fasta
+# equivalent to: wasp-run --fasta proteins.fasta
 ```
 
 Use exactly one input option: `--taxid`, `--fasta`, or `--structures`. The output directory is named after the input filename without its extension when using a FASTA file or structure archive.
