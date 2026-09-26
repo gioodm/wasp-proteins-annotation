@@ -107,7 +107,8 @@ wasp-run -f proteins.fasta -e 1e-50 -b 200
 To use a custom structural dataset (e.g., a newly sequenced genome or a set of proteins from different organisms), create a tar archive containing protein structures in `.cif.gz` or `.pdb.gz` format. Pass its path with `--structures`; no `gsutil` download is performed:
 
 ```bash
-wasp-run --structures proteins.tar
+wasp-run -p proteins.tar
+# equivalent to: wasp-run --structures proteins.tar
 ```
 
 ### 2.2 GEM gap-filling module
