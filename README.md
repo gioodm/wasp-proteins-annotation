@@ -14,17 +14,17 @@ WASP is a user-friendly command-line tool that only requires the NCBI taxonomy I
 
 If you find WASP helpful in your research, please cite us:
 
-    @article{delmissier2026wasp,
-  author  = {Del Missier, Giorgia and Shabestary, Kiyan and Ledesma-Amaro, Rodrigo},
-  title   = {WASP: a pipeline for functional annotation prediction based on AlphaFold structural models},
-  journal = {Nature Communications},
-  volume  = {17},
-  number  = {1},
-  pages   = {9156},
-  year    = {2026},
-  doi     = {10.1038/s41467-026-75956-z},
-  url     = {https://doi.org/10.1038/s41467-026-75956-z}
-}
+ @article{doi:10.1038/s41467-026-75956-z,
+      author  = {Del Missier, Giorgia and Shabestary, Kiyan and Ledesma-Amaro, Rodrigo},
+      title   = {WASP: a pipeline for functional annotation prediction based on AlphaFold structural models},
+      journal = {Nature Communications},
+      volume  = {17},
+      number  = {1},
+      pages   = {9156},
+      year    = {2026},
+      doi     = {10.1038/s41467-026-75956-z},
+      url     = {https://doi.org/10.1038/s41467-026-75956-z}
+    } 
 
 ## Table of Contents
 
