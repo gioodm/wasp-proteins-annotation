@@ -25,7 +25,8 @@ If you find WASP helpful in your research, please cite us:
   year    = {2026},
   doi     = {10.1038/s41467-026-75956-z},
   url     = {[https://doi.org/10.1038/s41467-026-75956-z](https://doi.org/10.1038/s41467-026-75956-z)}
-}'''
+}
+```
 
 ## Table of Contents
 
